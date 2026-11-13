@@ -1,0 +1,82 @@
+{
+  "summary": {
+    "lines": 4852,
+    "parsed": 4847,
+    "skipped": 5,
+    "categories": {
+      "cluster_search_noise": 2656,
+      "external": 1016,
+      "misroute": 101,
+      "not_nxdomain": 1066,
+      "unknown_short_name": 8
+    }
+  },
+  "findings": [
+    {
+      "caller_namespace": "shop",
+      "caller_workload": "shop/storefront",
+      "name": "payments-api",
+      "count": 51,
+      "suggestions": [
+        {
+          "host": "payments-api.payments.svc.cluster.local",
+          "ports": [
+            8080,
+            9090
+          ]
+        }
+      ]
+    },
+    {
+      "caller_namespace": "billing",
+      "caller_workload": "billing/billing",
+      "name": "mailer",
+      "count": 40,
+      "suggestions": [
+        {
+          "host": "mailer.notify.svc.cluster.local",
+          "ports": [
+            8080
+          ]
+        },
+        {
+          "host": "mailer.ops.svc.cluster.local",
+          "ports": [
+            2525
+          ]
+        }
+      ]
+    },
+    {
+      "caller_namespace": "notify",
+      "caller_workload": "notify/digest",
+      "name": "billing",
+      "count": 6,
+      "suggestions": [
+        {
+          "host": "billing.billing.svc.cluster.local",
+          "ports": [
+            8080
+          ]
+        }
+      ]
+    },
+    {
+      "caller_namespace": "payments",
+      "caller_workload": "unknown",
+      "caller_ips": [
+        "10.0.9.9"
+      ],
+      "name": "billing",
+      "count": 4,
+      "suggestions": [
+        {
+          "host": "billing.billing.svc.cluster.local",
+          "ports": [
+            8080
+          ]
+        }
+      ]
+    }
+  ]
+}

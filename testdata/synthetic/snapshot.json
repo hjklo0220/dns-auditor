@@ -1,0 +1,216 @@
+{
+  "apiVersion": "v1",
+  "items": [
+    {
+      "kind": "Namespace",
+      "metadata": {
+        "name": "shop"
+      }
+    },
+    {
+      "kind": "Namespace",
+      "metadata": {
+        "name": "billing"
+      }
+    },
+    {
+      "kind": "Namespace",
+      "metadata": {
+        "name": "payments"
+      }
+    },
+    {
+      "kind": "Namespace",
+      "metadata": {
+        "name": "notify"
+      }
+    },
+    {
+      "kind": "Namespace",
+      "metadata": {
+        "name": "ops"
+      }
+    },
+    {
+      "kind": "Namespace",
+      "metadata": {
+        "name": "kube-system"
+      }
+    },
+    {
+      "kind": "Service",
+      "metadata": {
+        "name": "billing",
+        "namespace": "billing"
+      },
+      "spec": {
+        "ports": [
+          {
+            "port": 8080,
+            "protocol": "TCP"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "Service",
+      "metadata": {
+        "name": "payments-api",
+        "namespace": "payments"
+      },
+      "spec": {
+        "ports": [
+          {
+            "port": 8080,
+            "protocol": "TCP"
+          },
+          {
+            "port": 9090,
+            "protocol": "TCP"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "Service",
+      "metadata": {
+        "name": "mailer",
+        "namespace": "notify"
+      },
+      "spec": {
+        "ports": [
+          {
+            "port": 8080,
+            "protocol": "TCP"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "Service",
+      "metadata": {
+        "name": "mailer",
+        "namespace": "ops"
+      },
+      "spec": {
+        "ports": [
+          {
+            "port": 2525,
+            "protocol": "TCP"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "Service",
+      "metadata": {
+        "name": "storefront",
+        "namespace": "shop"
+      },
+      "spec": {
+        "ports": [
+          {
+            "port": 8080,
+            "protocol": "TCP"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "Service",
+      "metadata": {
+        "name": "cart",
+        "namespace": "shop"
+      },
+      "spec": {
+        "ports": [
+          {
+            "port": 8080,
+            "protocol": "TCP"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "Pod",
+      "metadata": {
+        "labels": {
+          "pod-template-hash": "5c6d7e8f9"
+        },
+        "name": "storefront-5c6d7e8f9-x1y2z",
+        "namespace": "shop",
+        "ownerReferences": [
+          {
+            "controller": true,
+            "kind": "ReplicaSet",
+            "name": "storefront-5c6d7e8f9"
+          }
+        ]
+      },
+      "status": {
+        "podIP": "10.0.1.10"
+      }
+    },
+    {
+      "kind": "Pod",
+      "metadata": {
+        "labels": {
+          "pod-template-hash": "6d7e8f9a0"
+        },
+        "name": "cart-6d7e8f9a0-x1y2z",
+        "namespace": "shop",
+        "ownerReferences": [
+          {
+            "controller": true,
+            "kind": "ReplicaSet",
+            "name": "cart-6d7e8f9a0"
+          }
+        ]
+      },
+      "status": {
+        "podIP": "10.0.1.11"
+      }
+    },
+    {
+      "kind": "Pod",
+      "metadata": {
+        "labels": {
+          "pod-template-hash": "7e8f9a0b1"
+        },
+        "name": "billing-7e8f9a0b1-x1y2z",
+        "namespace": "billing",
+        "ownerReferences": [
+          {
+            "controller": true,
+            "kind": "ReplicaSet",
+            "name": "billing-7e8f9a0b1"
+          }
+        ]
+      },
+      "status": {
+        "podIP": "10.0.2.10"
+      }
+    },
+    {
+      "kind": "Pod",
+      "metadata": {
+        "labels": {
+          "pod-template-hash": "8f9a0b1c2"
+        },
+        "name": "digest-8f9a0b1c2-x1y2z",
+        "namespace": "notify",
+        "ownerReferences": [
+          {
+            "controller": true,
+            "kind": "ReplicaSet",
+            "name": "digest-8f9a0b1c2"
+          }
+        ]
+      },
+      "status": {
+        "podIP": "10.0.3.10"
+      }
+    }
+  ],
+  "kind": "List"
+}
