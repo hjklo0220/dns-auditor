@@ -7,6 +7,8 @@
 # one extended regex per line. Without that file only the generic checks run.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+# Default: sibling directory, same as scripts/check.sh.
+export DNS_AUDITOR_PRIVATE="${DNS_AUDITOR_PRIVATE:-$(cd .. && pwd)/dns-auditor-private}"
 
 if git rev-parse --git-dir >/dev/null 2>&1; then
   mapfile -t files < <(git ls-files -co --exclude-standard)
