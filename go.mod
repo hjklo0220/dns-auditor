@@ -3,6 +3,11 @@ module github.com/hjklo0220/dns-auditor
 go 1.26.0
 
 require (
+	github.com/dnstap/golang-dnstap v0.4.0
+	github.com/farsightsec/golang-framestream v0.3.0
+	github.com/miekg/dns v1.1.73
+	go.uber.org/goleak v1.3.0
+	google.golang.org/protobuf v1.36.12-0.20260120151049-f2248ac996af
 	k8s.io/api v0.37.2
 	k8s.io/apimachinery v0.37.2
 	k8s.io/client-go v0.37.2
@@ -43,7 +48,6 @@ require (
 	golang.org/x/term v0.45.0 // indirect
 	golang.org/x/text v0.40.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
-	google.golang.org/protobuf v1.36.12-0.20260120151049-f2248ac996af // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	k8s.io/klog/v2 v2.140.0 // indirect

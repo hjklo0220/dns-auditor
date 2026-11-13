@@ -3,3 +3,4 @@
 /internal/source/corednslog/testdata/fuzz/
 *.test
 *.out
+/internal/source/dnstap/testdata/fuzz/
