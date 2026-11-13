@@ -1,0 +1,5 @@
+/bin/
+/docs/results/*-latest.json
+/internal/source/corednslog/testdata/fuzz/
+*.test
+*.out

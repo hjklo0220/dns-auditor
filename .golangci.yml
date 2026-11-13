@@ -1,0 +1,22 @@
+version: "2"
+linters:
+  default: standard
+  enable:
+    - misspell
+    - unconvert
+    - errorlint
+    - bodyclose
+  settings:
+    errcheck:
+      exclude-functions:
+        # Closing a file opened read-only cannot lose data.
+        - (*os.File).Close
+        # Writes to in-memory buffers cannot fail.
+        - fmt.Fprintf(*bytes.Buffer)
+        - fmt.Fprintln(*text/tabwriter.Writer)
+        - fmt.Fprintf(*text/tabwriter.Writer)
+        # Last-resort error report before exit.
+        - fmt.Fprintln(*os.File)
+formatters:
+  enable:
+    - gofmt
