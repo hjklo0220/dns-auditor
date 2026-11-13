@@ -10,7 +10,7 @@ cd "$(dirname "$0")/.."
 export PATH="$HOME/.local/go/bin:$(go env GOPATH 2>/dev/null || echo "$HOME/go")/bin:$HOME/go/bin:$PATH"
 export DNS_AUDITOR_PRIVATE="${DNS_AUDITOR_PRIVATE:-$(cd .. && pwd)/dns-auditor-private}"
 mode="${1:-full}"
-COVER_PKGS=(./internal/rule ./internal/source/corednslog ./internal/inventory ./internal/report)
+COVER_PKGS=(./internal/rule ./internal/source/corednslog ./internal/source/dnstap ./internal/inventory ./internal/report)
 COVER_MIN=90
 FUZZTIME="${FUZZTIME:-10s}"
 RESULTS=docs/results
@@ -49,7 +49,10 @@ cover() {
   return $ok
 }
 
-fuzz() { go test -run='^$' -fuzz=FuzzParseLine -fuzztime="$FUZZTIME" ./internal/source/corednslog >/dev/null; }
+fuzz() {
+  go test -run='^$' -fuzz=FuzzParseLine -fuzztime="$FUZZTIME" ./internal/source/corednslog >/dev/null &&
+  go test -run='^$' -fuzz=FuzzDecode -fuzztime="$FUZZTIME" ./internal/source/dnstap >/dev/null
+}
 
 step fmt   fmt_check
 step vet   go vet ./...
