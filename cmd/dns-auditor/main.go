@@ -4,6 +4,7 @@
 //
 // Usage:
 //
+//	dns-auditor serve   [-dnstap-addr :6000] [-http-addr :8080] [-kubeconfig path] ...
 //	dns-auditor analyze -coredns-log coredns.log -snapshot snapshot.json [-format text|json]
 //	dns-auditor version
 //
@@ -45,9 +46,11 @@ func main() {
 
 func run(args []string, out io.Writer) error {
 	if len(args) == 0 {
-		return errors.New("usage: dns-auditor <analyze|version> [flags]")
+		return errors.New("usage: dns-auditor <serve|analyze|version> [flags]")
 	}
 	switch args[0] {
+	case "serve":
+		return cmdServe(args[1:])
 	case "analyze":
 		return cmdAnalyze(args[1:], out)
 	case "version":
