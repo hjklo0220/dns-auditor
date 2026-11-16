@@ -1,0 +1,23 @@
+# Only CoreDNS may send dnstap; only the monitoring namespace may scrape.
+# dnstap frames are not authenticated, so without this anyone who can reach
+# port 6000 could inject fake findings. Adjust the selectors to your cluster.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: dns-auditor
+  namespace: dns-auditor
+spec:
+  podSelector:
+    matchLabels: {app.kubernetes.io/name: dns-auditor}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: kube-system}
+          podSelector:
+            matchLabels: {k8s-app: kube-dns}
+      ports: [{port: 6000, protocol: TCP}]
+    - from:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: monitoring}
+      ports: [{port: 8080, protocol: TCP}]
