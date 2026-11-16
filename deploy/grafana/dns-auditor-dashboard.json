@@ -17,14 +17,14 @@
    {
     "type": "datasource",
     "name": "datasource",
-    "label": "Data source",
+    "label": "데이터 소스",
     "query": "prometheus",
     "current": {}
    },
    {
     "type": "query",
     "name": "namespace",
-    "label": "Caller namespace",
+    "label": "호출 네임스페이스",
     "datasource": {
      "type": "prometheus",
      "uid": "${datasource}"
@@ -48,7 +48,7 @@
  "panels": [
   {
    "type": "stat",
-   "title": "Active findings",
+   "title": "지금 잘못된 호출 수",
    "gridPos": {
     "x": 0,
     "y": 0,
@@ -103,7 +103,7 @@
   },
   {
    "type": "stat",
-   "title": "dnstap connections",
+   "title": "CoreDNS 연결 수",
    "gridPos": {
     "x": 6,
     "y": 0,
@@ -158,7 +158,7 @@
   },
   {
    "type": "stat",
-   "title": "Dropped events (1h)",
+   "title": "유실 이벤트(1시간)",
    "gridPos": {
     "x": 12,
     "y": 0,
@@ -212,7 +212,7 @@
   },
   {
    "type": "stat",
-   "title": "Responses/s classified",
+   "title": "초당 분류한 응답",
    "gridPos": {
     "x": 18,
     "y": 0,
@@ -254,7 +254,7 @@
   },
   {
    "type": "table",
-   "title": "Change these in-cluster calls (short name used across namespaces)",
+   "title": "고쳐야 할 내부 호출 (다른 네임스페이스 Service를 짧은 이름으로 호출)",
    "gridPos": {
     "x": 0,
     "y": 4,
@@ -265,7 +265,7 @@
     "type": "prometheus",
     "uid": "${datasource}"
    },
-   "description": "Each row is a workload that looked up another namespace's Service by its short name. The lookup fails (NXDOMAIN). Use the address in 'Use instead'. Rows disappear on their own after the fix (no failed lookup for the TTL, 15m by default).",
+   "description": "각 행은 다른 네임스페이스의 Service를 짧은 이름으로 조회해 실패(NXDOMAIN)한 워크로드입니다. '대신 쓸 주소'로 바꾸세요. 수정이 배포되면 TTL(기본 15분) 뒤 행이 저절로 사라집니다.",
    "targets": [
     {
      "datasource": {
@@ -312,11 +312,11 @@
        "Value #B": 4
       },
       "renameByName": {
-       "caller_workload": "Caller (namespace/workload)",
-       "name": "Looked up",
-       "suggestion": "Use instead",
-       "Value #A": "Failed lookups",
-       "Value #B": "Last seen"
+       "caller_workload": "호출한 곳 (ns/워크로드)",
+       "name": "찾은 이름",
+       "suggestion": "대신 쓸 주소",
+       "Value #A": "실패 횟수",
+       "Value #B": "마지막 발생"
       }
      }
     },
@@ -325,7 +325,7 @@
      "options": {
       "sort": [
        {
-        "field": "Failed lookups",
+        "field": "실패 횟수",
         "desc": true
        }
       ]
@@ -338,7 +338,7 @@
      {
       "matcher": {
        "id": "byName",
-       "options": "Last seen"
+       "options": "마지막 발생"
       },
       "properties": [
        {
@@ -357,7 +357,7 @@
   },
   {
    "type": "timeseries",
-   "title": "Misrouted lookups/s by caller",
+   "title": "호출자별 잘못된 조회(초당)",
    "gridPos": {
     "x": 0,
     "y": 14,
@@ -390,7 +390,7 @@
   },
   {
    "type": "timeseries",
-   "title": "DNS responses by category",
+   "title": "분류별 DNS 응답",
    "gridPos": {
     "x": 12,
     "y": 14,
@@ -428,7 +428,7 @@
   },
   {
    "type": "timeseries",
-   "title": "Receiver health",
+   "title": "수신기 상태",
    "gridPos": {
     "x": 0,
     "y": 22,
@@ -448,7 +448,7 @@
      "expr": "sum(rate(dns_auditor_dnstap_frames_total[5m]))",
      "refId": "A",
      "format": "time_series",
-     "legendFormat": "frames/s"
+     "legendFormat": "프레임/초"
     },
     {
      "datasource": {
@@ -458,7 +458,7 @@
      "expr": "sum(rate(dns_auditor_dnstap_dropped_total[5m]))",
      "refId": "B",
      "format": "time_series",
-     "legendFormat": "dropped/s"
+     "legendFormat": "유실/초"
     },
     {
      "datasource": {
@@ -468,7 +468,7 @@
      "expr": "sum(rate(dns_auditor_dnstap_decode_errors_total[5m]))",
      "refId": "C",
      "format": "time_series",
-     "legendFormat": "decode errors/s"
+     "legendFormat": "해석 오류/초"
     },
     {
      "datasource": {
@@ -478,7 +478,7 @@
      "expr": "sum(rate(dns_auditor_dnstap_rejected_total[5m]))",
      "refId": "D",
      "format": "time_series",
-     "legendFormat": "rejected conns/s"
+     "legendFormat": "거부된 연결/초"
     }
    ],
    "fieldConfig": {
