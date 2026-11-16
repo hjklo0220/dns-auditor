@@ -1,4 +1,0 @@
-  ./internal/rule                     100.0%
-  ./internal/source/corednslog         95.5%
-  ./internal/inventory                 98.0%
-  ./internal/report                   100.0%

@@ -30,6 +30,24 @@ if [[ -n "${DNS_AUDITOR_PRIVATE:-}" && -f "$patterns" ]]; then
     status=1
   fi
   echo "leak-scan: checked ${#files[@]} files (generic + organization patterns)"
+  # Published history matters too: every commit's tree and all messages/authors.
+  if git rev-parse --verify -q HEAD >/dev/null; then
+    pats=$(grep -vE '^\s*(#|$)' "$patterns" | paste -sd'|')
+    n=0
+    for c in $(git rev-list --all); do
+      n=$((n+1))
+      if git grep -qIiE "$pats" "$c" -- . ; then
+        echo "leak-scan: organization pattern in history, commit $c:" >&2
+        git grep -nIiE "$pats" "$c" -- . | head -5 >&2
+        status=1
+      fi
+    done
+    if git log --all --format='%an <%ae>%n%cn <%ce>%n%B' | grep -qiE "$pats"; then
+      echo "leak-scan: organization pattern in commit metadata" >&2
+      status=1
+    fi
+    echo "leak-scan: checked $n commits (trees, messages, authors)"
+  fi
 else
   echo "leak-scan: checked ${#files[@]} files (generic only; set DNS_AUDITOR_PRIVATE for organization patterns)"
 fi

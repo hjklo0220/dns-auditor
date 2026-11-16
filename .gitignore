@@ -4,3 +4,4 @@
 *.test
 *.out
 /internal/source/dnstap/testdata/fuzz/
+/docs/results/*-latest.txt
