@@ -2,8 +2,10 @@ package dnstap
 
 import (
 	"context"
+	"errors"
 	"net"
 	"net/netip"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -324,4 +326,93 @@ func FuzzDecode(f *testing.F) {
 			t.Fatalf("NXDOMAIN without question: %+v", ev)
 		}
 	})
+}
+
+// Regression (review #5): connections beyond MaxConns are refused, and a peer
+// that trickles the handshake is cut off by the absolute deadline.
+func TestReceiverBoundsConnections(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := &Receiver{Out: make(chan event.Event, 1), MaxConns: 2, HandshakeTimeout: 300 * time.Millisecond}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- r.Serve(ctx, ln) }()
+	defer func() {
+		cancel()
+		if err := <-done; err != nil {
+			t.Error(err)
+		}
+	}()
+
+	_, c1 := sender(t, ln.Addr().String())
+	defer func() { _ = c1.Close() }()
+	trickle, err := net.Dial("tcp", ln.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = trickle.Close() }()
+	waitFor(t, "two connections", func() bool { return r.Stats.Active.Load() == 2 })
+	third, err := net.Dial("tcp", ln.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = third.Close() }()
+	waitFor(t, "third rejected", func() bool { return r.Stats.Rejected.Load() == 1 })
+
+	// Trickle one byte at a time, each well inside a per-read timeout.
+	stopTrickle := make(chan struct{})
+	go func() {
+		t := time.NewTicker(50 * time.Millisecond)
+		defer t.Stop()
+		for {
+			select {
+			case <-stopTrickle:
+				return
+			case <-t.C:
+				if _, err := trickle.Write([]byte{0}); err != nil {
+					return
+				}
+			}
+		}
+	}()
+	defer close(stopTrickle)
+	waitFor(t, "trickling peer cut off", func() bool { return r.Stats.Active.Load() == 1 })
+}
+
+type flakyListener struct {
+	net.Listener
+	fails atomic.Int32
+}
+
+func (l *flakyListener) Accept() (net.Conn, error) {
+	if l.fails.Add(-1) >= 0 {
+		return nil, errors.New("accept: too many open files")
+	}
+	return l.Listener.Accept()
+}
+
+// Regression (review #4): transient accept errors are retried, not fatal.
+func TestReceiverRetriesTransientAcceptErrors(t *testing.T) {
+	inner, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ln := &flakyListener{Listener: inner}
+	ln.fails.Store(3)
+	r := &Receiver{Out: make(chan event.Event, 1)}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- r.Serve(ctx, ln) }()
+	_, c := sender(t, inner.Addr().String())
+	defer func() { _ = c.Close() }()
+	waitFor(t, "connection after retries", func() bool { return r.Stats.Active.Load() == 1 })
+	if r.Stats.AcceptErrors.Load() != 3 {
+		t.Fatalf("accept errors %d", r.Stats.AcceptErrors.Load())
+	}
+	cancel()
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
 }

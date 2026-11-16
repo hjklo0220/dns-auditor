@@ -45,15 +45,20 @@ type Stats struct {
 	Ignored      atomic.Uint64 // frames that are not client responses
 	DecodeErrors atomic.Uint64 // frames that could not be decoded
 	Dropped      atomic.Uint64 // events dropped because the queue was full
+	Rejected     atomic.Uint64 // connections refused because MaxConns was reached
+	AcceptErrors atomic.Uint64 // transient accept failures (retried)
 }
 
 // Receiver accepts dnstap connections and emits one event per client response.
 type Receiver struct {
 	// Out receives events. Sends never block; see Stats.Dropped.
 	Out chan<- event.Event
-	// HandshakeTimeout bounds the Frame Streams handshake. Default 10s.
+	// HandshakeTimeout bounds the whole Frame Streams handshake. Default 10s.
 	HandshakeTimeout time.Duration
-	Log              *slog.Logger
+	// MaxConns bounds concurrent connections (one per CoreDNS replica is
+	// normal). Extra connections are closed immediately. Default 64.
+	MaxConns int
+	Log      *slog.Logger
 
 	Stats Stats
 }
@@ -80,18 +85,51 @@ func (r *Receiver) Serve(ctx context.Context, ln net.Listener) error {
 	})
 	defer stop()
 
+	maxConns := r.MaxConns
+	if maxConns <= 0 {
+		maxConns = 64
+	}
+	backoff := time.Duration(0)
 	for {
 		c, err := ln.Accept()
 		if err != nil {
+			if ctx.Err() == nil && !errors.Is(err, net.ErrClosed) {
+				// Transient (e.g. EMFILE): retry like net/http does instead
+				// of taking the whole process down.
+				r.Stats.AcceptErrors.Add(1)
+				backoff = min(max(2*backoff, 5*time.Millisecond), time.Second)
+				log.Warn("dnstap accept failed, retrying", "err", err, "backoff", backoff)
+				select {
+				case <-time.After(backoff):
+					continue
+				case <-ctx.Done():
+				}
+			}
 			wg.Wait()
 			if ctx.Err() != nil {
 				return nil
 			}
 			return fmt.Errorf("dnstap accept: %w", err)
 		}
+		backoff = 0
 		mu.Lock()
+		if len(conns) >= maxConns {
+			mu.Unlock()
+			r.Stats.Rejected.Add(1)
+			_ = c.Close()
+			continue
+		}
 		conns[c] = struct{}{}
 		mu.Unlock()
+		// Shutdown may have run between Accept and registration; it would
+		// have missed this connection.
+		if ctx.Err() != nil {
+			mu.Lock()
+			delete(conns, c)
+			mu.Unlock()
+			_ = c.Close()
+			continue
+		}
 		r.Stats.Connections.Add(1)
 		r.Stats.Active.Add(1)
 		wg.Add(1)
@@ -116,14 +154,18 @@ func (r *Receiver) handle(c net.Conn) error {
 	if timeout <= 0 {
 		timeout = 10 * time.Second
 	}
+	// One absolute deadline for the whole handshake. The library's own
+	// Timeout is per read, so a peer trickling bytes could hold the
+	// connection forever.
+	_ = c.SetDeadline(time.Now().Add(timeout))
 	fr, err := framestream.NewReader(c, &framestream.ReaderOptions{
 		ContentTypes:  [][]byte{dnstap.FSContentType},
 		Bidirectional: true,
-		Timeout:       timeout,
 	})
 	if err != nil {
 		return fmt.Errorf("handshake: %w", err)
 	}
+	_ = c.SetDeadline(time.Time{}) // CoreDNS keeps the stream open and may idle
 	buf := make([]byte, MaxFrameSize)
 	for {
 		n, err := fr.ReadFrame(buf)
