@@ -1,0 +1,90 @@
+# Generic manifests. Apply, then point CoreDNS at the Service:
+#
+#   dnstap tcp://dns-auditor.dns-auditor.svc.cluster.local:6000 full
+#
+# (inside the `.:53 { ... }` server block of the Corefile)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dns-auditor
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dns-auditor
+  namespace: dns-auditor
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: dns-auditor
+rules:
+  - apiGroups: [""]
+    resources: [namespaces, services, pods]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: dns-auditor
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: dns-auditor
+subjects:
+  - kind: ServiceAccount
+    name: dns-auditor
+    namespace: dns-auditor
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dns-auditor
+  namespace: dns-auditor
+  labels: {app.kubernetes.io/name: dns-auditor}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}   # one receiver; CoreDNS reconnects to the Service
+  selector:
+    matchLabels: {app.kubernetes.io/name: dns-auditor}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: dns-auditor}
+    spec:
+      serviceAccountName: dns-auditor
+      automountServiceAccountToken: true
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: dns-auditor
+          image: ghcr.io/hjklo0220/dns-auditor:latest
+          args: [serve, -log-level=info]
+          ports:
+            - {name: dnstap, containerPort: 6000}
+            - {name: http, containerPort: 8080}
+          readinessProbe:
+            httpGet: {path: /readyz, port: http}
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 10
+          resources:
+            requests: {cpu: 20m, memory: 64Mi}
+            limits: {memory: 256Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dns-auditor
+  namespace: dns-auditor
+  labels: {app.kubernetes.io/name: dns-auditor}
+spec:
+  selector: {app.kubernetes.io/name: dns-auditor}
+  ports:
+    - {name: dnstap, port: 6000, targetPort: dnstap}
+    - {name: http, port: 8080, targetPort: http}
