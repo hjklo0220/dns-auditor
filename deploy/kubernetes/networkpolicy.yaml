@@ -1,23 +1,35 @@
-# Only CoreDNS may send dnstap; only the monitoring namespace may scrape.
-# dnstap frames are not authenticated, so without this anyone who can reach
-# port 6000 could inject fake findings. Adjust the selectors to your cluster.
+# 이 파일은 scripts/gen-manifests.sh가 charts/dns-auditor에서 생성한다. 직접 고치지 말 것.
+---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: dns-auditor
   namespace: dns-auditor
+  labels:
+    app.kubernetes.io/name: dns-auditor
+    app.kubernetes.io/instance: dns-auditor
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/managed-by: Helm
+    helm.sh/chart: dns-auditor-0.1.0
 spec:
   podSelector:
-    matchLabels: {app.kubernetes.io/name: dns-auditor}
+    matchLabels:
+      app.kubernetes.io/name: dns-auditor
+      app.kubernetes.io/instance: dns-auditor
   policyTypes: [Ingress]
   ingress:
     - from:
         - namespaceSelector:
-            matchLabels: {kubernetes.io/metadata.name: kube-system}
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
           podSelector:
-            matchLabels: {k8s-app: kube-dns}
+            matchLabels:
+              k8s-app: kube-dns
       ports: [{port: 6000, protocol: TCP}]
     - from:
         - namespaceSelector:
-            matchLabels: {kubernetes.io/metadata.name: monitoring}
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
       ports: [{port: 8080, protocol: TCP}]
+
+

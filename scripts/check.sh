@@ -49,6 +49,16 @@ cover() {
   return $ok
 }
 
+chart() {
+  if ! command -v helm >/dev/null; then
+    [[ -n "${CI:-}" ]] && { echo "helm missing in CI"; return 1; }
+    echo "  (helm not installed, skipped)"; return 0
+  fi
+  helm lint --quiet charts/dns-auditor >/dev/null &&
+  helm template t charts/dns-auditor --set serviceMonitor.enabled=true,networkPolicy.enabled=true,dashboard.enabled=true >/dev/null &&
+  bash scripts/gen-manifests.sh --check
+}
+
 fuzz() {
   go test -run='^$' -fuzz=FuzzParseLine -fuzztime="$FUZZTIME" ./internal/source/corednslog >/dev/null &&
   go test -run='^$' -fuzz=FuzzDecode -fuzztime="$FUZZTIME" ./internal/source/dnstap >/dev/null
@@ -61,6 +71,7 @@ if [[ "$mode" != quick ]]; then
   step lint  lint
   step cover cover
   step fuzz  fuzz
+  step chart chart
   step leak  bash scripts/leak-scan.sh
 fi
 

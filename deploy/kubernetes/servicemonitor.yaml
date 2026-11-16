@@ -1,13 +1,23 @@
-# Optional, for the Prometheus Operator.
+# 이 파일은 scripts/gen-manifests.sh가 charts/dns-auditor에서 생성한다. 직접 고치지 말 것.
+---
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   name: dns-auditor
   namespace: dns-auditor
+  labels:
+    app.kubernetes.io/name: dns-auditor
+    app.kubernetes.io/instance: dns-auditor
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/managed-by: Helm
+    helm.sh/chart: dns-auditor-0.1.0
 spec:
   selector:
-    matchLabels: {app.kubernetes.io/name: dns-auditor}
+    matchLabels:
+      app.kubernetes.io/name: dns-auditor
+      app.kubernetes.io/instance: dns-auditor
   endpoints:
     - port: http
       path: /metrics
       interval: 30s
+

@@ -1,10 +1,6 @@
-# Generic manifests. Apply, then point CoreDNS at the Service's ClusterIP
-# (CoreDNS Pods usually use dnsPolicy: Default and cannot resolve
-# *.svc.cluster.local names):
-#
-#   dnstap tcp://<clusterIP>:6000 full
-#
-# (inside the `.:53 { ... }` server block of the Corefile)
+# 이 파일은 scripts/gen-manifests.sh가 charts/dns-auditor에서 생성한다. 직접 고치지 말 것.
+# 적용 후 CoreDNS Corefile에: dnstap tcp://<이 Service의 ClusterIP>:6000 full
+---
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -15,20 +11,40 @@ kind: ServiceAccount
 metadata:
   name: dns-auditor
   namespace: dns-auditor
+  labels:
+    app.kubernetes.io/name: dns-auditor
+    app.kubernetes.io/instance: dns-auditor
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/managed-by: Helm
+    helm.sh/chart: dns-auditor-0.1.0
+
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: dns-auditor
+  labels:
+    app.kubernetes.io/name: dns-auditor
+    app.kubernetes.io/instance: dns-auditor
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/managed-by: Helm
+    helm.sh/chart: dns-auditor-0.1.0
 rules:
   - apiGroups: [""]
     resources: [namespaces, services, pods]
     verbs: [get, list, watch]
+
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: dns-auditor
+  labels:
+    app.kubernetes.io/name: dns-auditor
+    app.kubernetes.io/instance: dns-auditor
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/managed-by: Helm
+    helm.sh/chart: dns-auditor-0.1.0
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -37,31 +53,72 @@ subjects:
   - kind: ServiceAccount
     name: dns-auditor
     namespace: dns-auditor
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dns-auditor
+  namespace: dns-auditor
+  labels:
+    app.kubernetes.io/name: dns-auditor
+    app.kubernetes.io/instance: dns-auditor
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/managed-by: Helm
+    helm.sh/chart: dns-auditor-0.1.0
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: dns-auditor
+    app.kubernetes.io/instance: dns-auditor
+  ports:
+    - {name: dnstap, port: 6000, targetPort: dnstap}
+    - {name: http, port: 8080, targetPort: http}
+
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: dns-auditor
   namespace: dns-auditor
-  labels: {app.kubernetes.io/name: dns-auditor}
+  labels:
+    app.kubernetes.io/name: dns-auditor
+    app.kubernetes.io/instance: dns-auditor
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/managed-by: Helm
+    helm.sh/chart: dns-auditor-0.1.0
 spec:
   replicas: 1
-  strategy: {type: Recreate}   # one receiver; CoreDNS reconnects to the Service
+  strategy: {type: Recreate}
   selector:
-    matchLabels: {app.kubernetes.io/name: dns-auditor}
+    matchLabels:
+      app.kubernetes.io/name: dns-auditor
+      app.kubernetes.io/instance: dns-auditor
   template:
     metadata:
-      labels: {app.kubernetes.io/name: dns-auditor}
+      labels:
+        app.kubernetes.io/name: dns-auditor
+        app.kubernetes.io/instance: dns-auditor
     spec:
       serviceAccountName: dns-auditor
-      automountServiceAccountToken: true
       securityContext:
         runAsNonRoot: true
-        seccompProfile: {type: RuntimeDefault}
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: dns-auditor
-          image: ghcr.io/hjklo0220/dns-auditor:latest
-          args: [serve, -log-level=info]
+          image: "ghcr.io/hjklo0220/dns-auditor:0.1.0"
+          imagePullPolicy: IfNotPresent
+          args:
+            - serve
+            - -dnstap-addr=:6000
+            - -http-addr=:8080
+            - -ttl=15m
+            - -pod-grace=5m
+            - -max-findings=1000
+            - -queue-size=10000
+            - -cluster-domain=cluster.local
+            - -log-level=info
           ports:
             - {name: dnstap, containerPort: 6000}
             - {name: http, containerPort: 8080}
@@ -72,21 +129,14 @@ spec:
             httpGet: {path: /healthz, port: http}
             periodSeconds: 10
           resources:
-            requests: {cpu: 20m, memory: 64Mi}
-            limits: {memory: 256Mi}
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 20m
+              memory: 64Mi
           securityContext:
             allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
             readOnlyRootFilesystem: true
-            capabilities: {drop: [ALL]}
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: dns-auditor
-  namespace: dns-auditor
-  labels: {app.kubernetes.io/name: dns-auditor}
-spec:
-  selector: {app.kubernetes.io/name: dns-auditor}
-  ports:
-    - {name: dnstap, port: 6000, targetPort: dnstap}
-    - {name: http, port: 8080, targetPort: http}
