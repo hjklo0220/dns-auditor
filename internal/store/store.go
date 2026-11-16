@@ -72,8 +72,8 @@ func (s *Store) Add(f *rule.Finding, at time.Time) {
 	if f == nil {
 		return
 	}
-	if at.IsZero() {
-		at = s.now()
+	if now := s.now(); at.IsZero() || at.After(now) {
+		at = now // a future time would keep the finding active past its TTL
 	}
 	wl := report.UnknownWorkload
 	if f.Caller.Name != "" {
@@ -97,6 +97,9 @@ func (s *Store) Add(f *rule.Finding, at time.Time) {
 	e.Count++
 	if at.After(e.LastSeen) {
 		e.LastSeen = at
+	}
+	if at.Before(e.FirstSeen) {
+		e.FirstSeen = at
 	}
 	e.Suggestions = f.Suggestions // the inventory may have changed
 	if wl == report.UnknownWorkload && f.CallerIP.IsValid() && len(e.CallerIPs) < maxIPs && !contains(e.CallerIPs, f.CallerIP) {

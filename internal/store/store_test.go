@@ -160,3 +160,21 @@ func TestConcurrentUse(t *testing.T) {
 		t.Fatalf("store exceeded bound: %d", s.Len())
 	}
 }
+
+// Regression (review #7): a future timestamp must not pin a finding past the
+// TTL, and a late event moves FirstSeen back.
+func TestTimestampsAreClamped(t *testing.T) {
+	s, c := newStore(15*time.Minute, 10)
+	s.Add(f("shop", "web", "billing", "10.0.0.1", "h"), c.now().Add(24*time.Hour))
+	if e := s.Active()[0]; !e.LastSeen.Equal(c.now()) {
+		t.Fatalf("future time not clamped: %v", e.LastSeen)
+	}
+	s.Add(f("shop", "web", "billing", "10.0.0.1", "h"), c.now().Add(-time.Minute))
+	if e := s.Active()[0]; !e.FirstSeen.Equal(c.now().Add(-time.Minute)) {
+		t.Fatalf("FirstSeen not moved back: %v", e.FirstSeen)
+	}
+	c.add(16 * time.Minute)
+	if len(s.Active()) != 0 {
+		t.Fatal("finding outlived its TTL")
+	}
+}

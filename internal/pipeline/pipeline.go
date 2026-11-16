@@ -5,6 +5,7 @@ package pipeline
 import (
 	"context"
 	"sync/atomic"
+	"time"
 
 	"github.com/hjklo0220/dns-auditor/internal/event"
 	"github.com/hjklo0220/dns-auditor/internal/inventory"
@@ -42,7 +43,9 @@ func (p *Pipeline) Handle(ev event.Event) {
 	c, f := p.Classifier.Classify(ev, p.Inventory)
 	p.counts[index(c)].Add(1)
 	if f != nil {
-		p.Store.Add(f, ev.Time)
+		// Use the local clock, not the dnstap timestamp: it is compared
+		// against the local clock for the TTL, and senders can be skewed.
+		p.Store.Add(f, time.Time{})
 	}
 }
 
