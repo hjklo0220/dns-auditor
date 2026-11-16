@@ -21,6 +21,7 @@ func testInventory() *inventory.Static {
 	inv.AddService(inventory.Service{Namespace: "shop", Name: "storefront", Ports: []inventory.Port{{Port: 8080}}})
 	inv.AddService(inventory.Service{Namespace: "shop", Name: "headless", Ports: nil})
 	inv.AddPod(netip.MustParseAddr("10.0.1.10"), inventory.Workload{Namespace: "shop", Kind: "Deployment", Name: "storefront"})
+	inv.AddPod(netip.MustParseAddr("10.0.2.20"), inventory.Workload{Namespace: "ops", Kind: "Deployment", Name: "cron"})
 	return inv
 }
 
@@ -74,6 +75,7 @@ func TestClassify(t *testing.T) {
 		{"SRV style labels", "_grpclb._tcp.billing.shop.svc.cluster.local.", "NXDOMAIN", storefront, ClusterSearchNoise, nil},
 		{"empty service label", ".shop.svc.cluster.local.", "NXDOMAIN", storefront, ClusterSearchNoise, nil},
 		{"short name exists nowhere", "nothere.shop.svc.cluster.local.", "NXDOMAIN", storefront, UnknownShortName, nil},
+		{"known caller in another namespace (typed ns or FQDN)", "billing.shop.svc.cluster.local.", "NXDOMAIN", netip.MustParseAddr("10.0.2.20"), ClusterSearchNoise, nil},
 		{"similar suffix is not the cluster domain", "billing.shop.svc.cluster.localhost.", "NXDOMAIN", storefront, External, nil},
 	}
 	for _, tt := range tests {

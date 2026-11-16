@@ -86,6 +86,13 @@ func (c Classifier) Classify(ev event.Event, inv inventory.Lookup) (Category, *F
 	if !inv.HasNamespace(ns) {
 		return ClusterSearchNoise, nil
 	}
+	// The first search-list candidate always carries the caller's own
+	// namespace. If the caller is known and lives elsewhere, the name was
+	// typed with a namespace (or as an FQDN); that is not this pattern.
+	caller, known := inv.WorkloadForIP(ev.ClientIP)
+	if known && !strings.EqualFold(caller.Namespace, ns) {
+		return ClusterSearchNoise, nil
+	}
 	var elsewhere []inventory.Service
 	for _, s := range inv.ServicesNamed(name) {
 		if strings.EqualFold(s.Namespace, ns) {
@@ -99,8 +106,8 @@ func (c Classifier) Classify(ev event.Event, inv inventory.Lookup) (Category, *F
 		return UnknownShortName, nil
 	}
 	f := &Finding{CallerNamespace: ns, CallerIP: ev.ClientIP, Name: name}
-	if w, ok := inv.WorkloadForIP(ev.ClientIP); ok {
-		f.Caller = w
+	if known {
+		f.Caller = caller
 	}
 	for _, s := range elsewhere {
 		sg := Suggestion{Host: strings.ToLower(s.Name + "." + s.Namespace + c.svcSuffix)}
