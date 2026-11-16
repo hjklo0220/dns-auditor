@@ -1,25 +1,21 @@
-# CoreDNS overhead benchmark
+# CoreDNS 영향 벤치마크
 
-`scripts/bench.sh` runs the real CoreDNS binary locally and compares four
-cases at fixed query rates:
+`scripts/bench.sh`는 실제 CoreDNS 바이너리를 로컬에서 띄우고, 정해진 질의 속도에서 네 가지 조건을 비교합니다.
 
-| Case | CoreDNS config |
+| 조건 | CoreDNS 설정 |
 |---|---|
-| A | no dnstap (baseline) |
-| B | `dnstap ... full` -> dns-auditor (normal operation) |
-| C | `dnstap ... full` -> nothing listening (auditor down) |
-| D | `dnstap ... full` -> a sink that handshakes and never reads (auditor stuck) |
+| A | dnstap 없음 (기준) |
+| B | `dnstap ... full` → dns-auditor (정상 운영) |
+| C | `dnstap ... full` → 수신기 없음 (dns-auditor 꺼짐) |
+| D | `dnstap ... full` → 핸드셰이크만 하고 읽지 않는 수신기 (dns-auditor 멈춤) |
 
-The query mix is shaped like an `ndots:5` cluster: about 75% NXDOMAIN
-search-list expansions, the rest answered. Cases are interleaved (A B C D,
-three times) and medians are reported.
+질의는 `ndots:5` 클러스터와 비슷하게 섞었습니다(약 75%가 search 목록 NXDOMAIN, 나머지는 정상 응답). 조건을 A B C D 순서로 번갈아 3번 돌리고 중앙값을 냅니다.
 
-## Results (2026-11-16)
+## 결과 (2026-11-16)
 
-CoreDNS 1.14.7, 4 vCPU WSL2 VM, 20 s per run, 3 runs per cell.
-`cpu%` is the CoreDNS process as a share of one core.
+CoreDNS 1.14.7, 4 vCPU WSL2 VM, 1회 20초, 칸마다 3회. `cpu%`는 CoreDNS 프로세스의 코어 1개 대비 사용률입니다.
 
-| Case | qps | DNS failures | p50 ms | p99 ms (median / min) | CoreDNS cpu% | CoreDNS RSS max MiB | auditor RSS MiB | auditor drops |
+| 조건 | qps | DNS 실패 | p50 ms | p99 ms (중앙값 / 최솟값) | CoreDNS cpu% | CoreDNS 최대 RSS MiB | auditor RSS MiB | auditor 유실 |
 |---|---|---|---|---|---|---|---|---|
 | A |  150 | 0 | 0.51 | 1.07 / 0.79 |  5.4 | 55.0 | – | – |
 | A |  750 | 0 | 0.44 | 2.19 / 0.66 | 21.9 | 56.5 | – | – |
@@ -34,30 +30,17 @@ CoreDNS 1.14.7, 4 vCPU WSL2 VM, 20 s per run, 3 runs per cell.
 | D |  750 | 0 | 0.43 | 1.15 / 0.87 | 26.1 | 62.3 | – | – |
 | D | 1500 | 0 | 0.34 | 1.67 / 1.27 | 35.7 | 66.5 | – | – |
 
-Raw data: `docs/results/bench-2026-11-16.json`.
+원본 데이터: `docs/results/bench-2026-11-16.json`
 
-## Reading the numbers
+## 해석
 
-- **No DNS failures in any of the 36 runs**, including when the receiver is
-  down (C) or stuck (D). CoreDNS's dnstap output is asynchronous; when the
-  receiver does not read, CoreDNS buffers (RSS +5 to +9 MiB in D) and drops.
-  It does not slow down answers.
-- **Median latency is unchanged** (p50 within ±0.05 ms).
-- **p99 is dominated by VM noise.** The baseline alone ranged from 0.66 ms to
-  19.6 ms between runs at 750 qps. Comparing the best run of each case, the
-  difference is at most 0.2 ms. Confirm tail latency on a real cluster with
-  `coredns_dns_request_duration_seconds`.
-- **CPU: dnstap with `full` costs CoreDNS about +2 / +4 / +6 points of one core
-  at 150 / 750 / 1500 qps** (+38% / +20% / +17% relative). B, C and D cost
-  about the same, so this is CoreDNS serializing dnstap messages, not
-  dns-auditor. The `full` flag is required because the response code is only
-  in the wire message, and CoreDNS sends both queries and responses.
-- **dns-auditor itself:** about 37 MiB RSS and zero dropped events at 1,500 qps
-  (about 3,000 dnstap frames/s).
+- **36회 모두 DNS 실패 0건.** 수신기가 꺼졌을 때(C)와 멈췄을 때(D)도 마찬가지입니다. CoreDNS의 dnstap 출력은 비동기라서, 받는 쪽이 읽지 않으면 버퍼에 쌓다가(D에서 RSS +5~9MiB) 버릴 뿐 응답을 늦추지 않습니다.
+- **중앙 지연(p50)은 변화가 없습니다**(±0.05ms).
+- **p99는 VM 잡음이 지배합니다.** 기준 A만 해도 750qps에서 회차마다 0.66ms~19.6ms로 흔들렸습니다. 조건별 최선값끼리 비교하면 차이는 0.2ms 이하입니다. 꼬리 지연은 실제 클러스터에서 `coredns_dns_request_duration_seconds`로 확인합니다.
+- **CPU: `full` 옵션의 dnstap은 CoreDNS에 150 / 750 / 1500 qps에서 코어 1개 기준 약 +2 / +4 / +6%p**(상대 +38% / +20% / +17%)를 더합니다. B·C·D가 거의 같으므로 dns-auditor가 아니라 CoreDNS가 dnstap 메시지를 만드는 비용입니다. 응답 코드가 DNS 메시지 원문에만 있어서 `full`이 필요하고, CoreDNS는 질의와 응답을 모두 보냅니다.
+- **dns-auditor 자체:** 1,500 qps(dnstap 프레임 초당 약 3,000개)에서 RSS 약 37MiB, 유실 0건.
 
-## Limits of this setup
+## 측정 환경의 한계
 
-- The `template` plugin stands in for the `kubernetes` plugin, so the absolute
-  CPU numbers are lower than in a cluster. The dnstap cost per query is what
-  carries over.
-- The generator, CoreDNS and dns-auditor share one 4 vCPU VM over loopback.
+- `kubernetes` 플러그인 대신 `template` 플러그인으로 응답을 흉내 냈기 때문에, CPU 절대값은 실제 클러스터보다 낮습니다. 그대로 옮겨 쓸 수 있는 것은 질의당 dnstap 비용입니다.
+- 부하 생성기, CoreDNS, dns-auditor가 4 vCPU VM 하나에서 loopback으로 통신합니다.
