@@ -44,6 +44,8 @@ const snapshot = `{"kind":"List","items":[
    "ownerReferences":[{"kind":"ReplicaSet","name":"storefront-7d9f8c6b5","controller":true}]},
    "status":{"podIP":"10.0.1.10","podIPs":[{"ip":"10.0.1.10"},{"ip":"fd00::10"}]}},
  {"kind":"Pod","metadata":{"name":"node-agent","namespace":"kube-system"},"spec":{"hostNetwork":true},"status":{"podIP":"10.0.0.5"}},
+ {"kind":"Pod","metadata":{"name":"zz-batch-1","namespace":"shop","ownerReferences":[{"kind":"Job","name":"zz-batch"}]},"status":{"phase":"Succeeded","podIP":"10.0.1.10"}},
+ {"kind":"Pod","metadata":{"name":"zz-batch-2","namespace":"shop"},"status":{"phase":"Failed","podIP":"10.0.1.10"}},
  {"kind":"ConfigMap","metadata":{"name":"ignored","namespace":"shop"}}
 ]}`
 

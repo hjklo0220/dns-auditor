@@ -22,6 +22,7 @@ type k8sObject struct {
 		HostNetwork bool   `json:"hostNetwork"`
 	} `json:"spec"`
 	Status struct {
+		Phase  string `json:"phase"`
 		PodIP  string `json:"podIP"`
 		PodIPs []struct {
 			IP string `json:"ip"`
@@ -62,6 +63,9 @@ func add(o k8sObject, s *Static) error {
 	case o.Kind == "Pod":
 		if o.Spec.HostNetwork {
 			return nil // shares the node IP; cannot be attributed to one workload
+		}
+		if o.Status.Phase == "Succeeded" || o.Status.Phase == "Failed" {
+			return nil // finished; its IP may already belong to another Pod
 		}
 		w := WorkloadFromPod(o.Metadata.Namespace, o.Metadata.Name, o.Metadata.Labels, o.Metadata.OwnerReferences)
 		ips := []string{o.Status.PodIP}
