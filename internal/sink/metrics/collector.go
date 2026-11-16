@@ -48,6 +48,8 @@ var (
 	descIgnored   = prometheus.NewDesc("dns_auditor_dnstap_ignored_total", "dnstap frames that are not client responses.", nil, nil)
 	descDecodeErr = prometheus.NewDesc("dns_auditor_dnstap_decode_errors_total", "dnstap frames that could not be decoded.", nil, nil)
 	descDropped   = prometheus.NewDesc("dns_auditor_dnstap_dropped_total", "Events dropped because the processing queue was full.", nil, nil)
+	descRejected  = prometheus.NewDesc("dns_auditor_dnstap_rejected_total", "dnstap connections refused because the connection limit was reached.", nil, nil)
+	descAcceptErr = prometheus.NewDesc("dns_auditor_dnstap_accept_errors_total", "Transient dnstap accept failures (retried).", nil, nil)
 	descInventory = prometheus.NewDesc("dns_auditor_inventory_objects", "Objects tracked by the inventory.", []string{"kind"}, nil)
 )
 
@@ -60,7 +62,7 @@ func New(src Sources) *Collector { return &Collector{src: src} }
 // Describe implements prometheus.Collector.
 func (c *Collector) Describe(ch chan<- *prometheus.Desc) {
 	for _, d := range []*prometheus.Desc{descLookups, descLastSeen, descActive, descEvicted, descResponses,
-		descConnAct, descConnTotal, descFrames, descIgnored, descDecodeErr, descDropped, descInventory} {
+		descConnAct, descConnTotal, descFrames, descIgnored, descDecodeErr, descDropped, descRejected, descAcceptErr, descInventory} {
 		ch <- d
 	}
 }
@@ -90,6 +92,8 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 		ch <- prometheus.MustNewConstMetric(descIgnored, prometheus.CounterValue, float64(d.Ignored.Load()))
 		ch <- prometheus.MustNewConstMetric(descDecodeErr, prometheus.CounterValue, float64(d.DecodeErrors.Load()))
 		ch <- prometheus.MustNewConstMetric(descDropped, prometheus.CounterValue, float64(d.Dropped.Load()))
+		ch <- prometheus.MustNewConstMetric(descRejected, prometheus.CounterValue, float64(d.Rejected.Load()))
+		ch <- prometheus.MustNewConstMetric(descAcceptErr, prometheus.CounterValue, float64(d.AcceptErrors.Load()))
 	}
 	if inv := c.src.Inventory; inv != nil {
 		n, s, p := inv.Stats()
@@ -101,13 +105,23 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 
 // Suggestion renders suggestions as one label value, e.g.
 // "billing.billing.svc.cluster.local:8080" or "a.x.svc.cluster.local:{80,9090} | a.y.svc.cluster.local:80".
+//
+// At most MaxSuggestions are listed, followed by "(+N more)", to keep the
+// label short when many namespaces have a Service with the same name.
 func Suggestion(s []rule.Suggestion) string {
-	parts := make([]string, len(s))
-	for i, sg := range s {
-		parts[i] = sg.Host + portSuffix(sg.Ports)
+	n := min(len(s), MaxSuggestions)
+	parts := make([]string, 0, n+1)
+	for _, sg := range s[:n] {
+		parts = append(parts, sg.Host+portSuffix(sg.Ports))
+	}
+	if extra := len(s) - n; extra > 0 {
+		parts = append(parts, fmt.Sprintf("(+%d more)", extra))
 	}
 	return strings.Join(parts, " | ")
 }
+
+// MaxSuggestions bounds the suggestion label.
+const MaxSuggestions = 3
 
 func portSuffix(ports []int32) string {
 	switch len(ports) {

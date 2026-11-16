@@ -74,7 +74,7 @@ dns_auditor_inventory_objects{kind="service_name"} 2
 	if err := testutil.CollectAndCompare(c, strings.NewReader(want), names...); err != nil {
 		t.Fatal(err)
 	}
-	if n := testutil.CollectAndCount(c); n != 2+1+1+5+6+3 {
+	if n := testutil.CollectAndCount(c); n != 2+1+1+5+8+3 {
 		t.Fatalf("series %d", n)
 	}
 	// Registers cleanly (descriptors consistent with metrics).
@@ -99,6 +99,16 @@ func TestEmptySources(t *testing.T) {
 func TestSuggestion(t *testing.T) {
 	got := Suggestion([]rule.Suggestion{{Host: "a.x.svc.cluster.local", Ports: []int32{80, 9090}}, {Host: "a.y.svc.cluster.local"}, {Host: "a.z.svc.cluster.local", Ports: []int32{80}}})
 	if got != "a.x.svc.cluster.local:{80,9090} | a.y.svc.cluster.local | a.z.svc.cluster.local:80" {
+		t.Fatal(got)
+	}
+}
+
+func TestSuggestionIsBounded(t *testing.T) {
+	var s []rule.Suggestion
+	for _, ns := range []string{"a", "b", "c", "d", "e"} {
+		s = append(s, rule.Suggestion{Host: "redis." + ns + ".svc.cluster.local", Ports: []int32{6379}})
+	}
+	if got := Suggestion(s); got != "redis.a.svc.cluster.local:6379 | redis.b.svc.cluster.local:6379 | redis.c.svc.cluster.local:6379 | (+2 more)" {
 		t.Fatal(got)
 	}
 }
