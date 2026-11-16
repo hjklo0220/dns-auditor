@@ -1,0 +1,73 @@
+# dns-auditor 기본값. 사내 값은 별도 values 파일로 덮어쓴다.
+
+image:
+  repository: ghcr.io/hjklo0220/dns-auditor
+  tag: ""                # 비우면 Chart.appVersion
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+
+# serve 명령 옵션
+config:
+  ttl: 15m               # 마지막 발생 후 이 시간이 지나면 탐지가 사라짐
+  podGrace: 5m           # 삭제된 Pod의 IP를 워크로드로 계속 인식하는 시간
+  maxFindings: 1000      # 저장하는 탐지 수 상한(지표 라벨 수 상한)
+  queueSize: 10000       # 수신기와 분류기 사이 버퍼, 넘치면 버림
+  clusterDomain: cluster.local
+  logLevel: info
+extraArgs: []
+
+service:
+  type: ClusterIP
+  # CoreDNS는 보통 dnsPolicy: Default라 Service 이름을 못 풀어서 Corefile에
+  # ClusterIP를 직접 적는다. 재설치해도 주소가 바뀌지 않게 고정할 수 있다.
+  clusterIP: ""
+  dnstapPort: 6000
+  httpPort: 8080
+
+rbac:
+  create: true           # namespaces·services·pods get/list/watch
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+replicaCount: 1          # 수신기는 1개(CoreDNS가 Service로 재연결)
+resources:
+  requests: {cpu: 20m, memory: 64Mi}
+  limits: {memory: 256Mi}
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile: {type: RuntimeDefault}
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities: {drop: [ALL]}
+podAnnotations: {}
+podLabels: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# Prometheus Operator
+serviceMonitor:
+  enabled: false
+  labels: {}             # Prometheus의 serviceMonitorSelector와 맞출 라벨
+  interval: 30s
+
+# dnstap에는 인증이 없으므로 CoreDNS만 6000 포트에 접근하게 막는다.
+networkPolicy:
+  enabled: false
+  dnstapFrom:
+    - namespaceSelector:
+        matchLabels: {kubernetes.io/metadata.name: kube-system}
+      podSelector:
+        matchLabels: {k8s-app: kube-dns}
+  metricsFrom:
+    - namespaceSelector:
+        matchLabels: {kubernetes.io/metadata.name: monitoring}
+
+# Grafana 사이드카가 읽는 대시보드 ConfigMap
+dashboard:
+  enabled: false
+  labels: {grafana_dashboard: "1"}
+  annotations: {}

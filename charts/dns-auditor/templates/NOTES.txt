@@ -1,0 +1,11 @@
+dns-auditor가 설치되었습니다.
+
+1. CoreDNS 서버 블록에 아래 한 줄을 추가하세요(Service 이름이 아니라 ClusterIP):
+
+     dnstap tcp://{{ if .Values.service.clusterIP }}{{ .Values.service.clusterIP }}{{ else }}<ClusterIP>{{ end }}:{{ .Values.service.dnstapPort }} full
+
+   ClusterIP 확인:
+     kubectl -n {{ .Release.Namespace }} get svc {{ include "dns-auditor.fullname" . }} -o jsonpath='{.spec.clusterIP}'
+
+2. 지금 탐지된 잘못된 호출:
+     kubectl get --raw /api/v1/namespaces/{{ .Release.Namespace }}/services/http:{{ include "dns-auditor.fullname" . }}:{{ .Values.service.httpPort }}/proxy/findings

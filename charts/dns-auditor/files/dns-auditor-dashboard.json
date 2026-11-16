@@ -1,0 +1,493 @@
+{
+ "title": "dns-auditor",
+ "uid": "dns-auditor",
+ "schemaVersion": 39,
+ "version": 1,
+ "tags": [
+  "dns",
+  "kubernetes"
+ ],
+ "time": {
+  "from": "now-6h",
+  "to": "now"
+ },
+ "refresh": "1m",
+ "templating": {
+  "list": [
+   {
+    "type": "datasource",
+    "name": "datasource",
+    "label": "데이터 소스",
+    "query": "prometheus",
+    "current": {}
+   },
+   {
+    "type": "query",
+    "name": "namespace",
+    "label": "호출 네임스페이스",
+    "datasource": {
+     "type": "prometheus",
+     "uid": "${datasource}"
+    },
+    "query": {
+     "query": "label_values(dns_auditor_misroute_last_seen_timestamp_seconds, caller_namespace)",
+     "refId": "ns"
+    },
+    "definition": "label_values(dns_auditor_misroute_last_seen_timestamp_seconds, caller_namespace)",
+    "includeAll": true,
+    "multi": true,
+    "allValue": ".*",
+    "current": {
+     "text": "All",
+     "value": "$__all"
+    },
+    "refresh": 2
+   }
+  ]
+ },
+ "panels": [
+  {
+   "type": "stat",
+   "title": "지금 잘못된 호출 수",
+   "gridPos": {
+    "x": 0,
+    "y": 0,
+    "w": 6,
+    "h": 4
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${datasource}"
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${datasource}"
+     },
+     "expr": "dns_auditor_misroute_active",
+     "refId": "A",
+     "format": "time_series",
+     "legendFormat": "",
+     "instant": true,
+     "range": false
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "red",
+        "value": 1
+       }
+      ]
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ]
+    },
+    "colorMode": "background"
+   },
+   "id": 1
+  },
+  {
+   "type": "stat",
+   "title": "CoreDNS 연결 수",
+   "gridPos": {
+    "x": 6,
+    "y": 0,
+    "w": 6,
+    "h": 4
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${datasource}"
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${datasource}"
+     },
+     "expr": "sum(dns_auditor_dnstap_connections_active)",
+     "refId": "A",
+     "format": "time_series",
+     "legendFormat": "",
+     "instant": true,
+     "range": false
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "red",
+        "value": null
+       },
+       {
+        "color": "green",
+        "value": 1
+       }
+      ]
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ]
+    },
+    "colorMode": "value"
+   },
+   "id": 2
+  },
+  {
+   "type": "stat",
+   "title": "유실 이벤트(1시간)",
+   "gridPos": {
+    "x": 12,
+    "y": 0,
+    "w": 6,
+    "h": 4
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${datasource}"
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${datasource}"
+     },
+     "expr": "sum(increase(dns_auditor_dnstap_dropped_total[1h]))",
+     "refId": "A",
+     "format": "time_series",
+     "legendFormat": "",
+     "instant": true,
+     "range": false
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 1
+       }
+      ]
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ]
+    }
+   },
+   "id": 3
+  },
+  {
+   "type": "stat",
+   "title": "초당 분류한 응답",
+   "gridPos": {
+    "x": 18,
+    "y": 0,
+    "w": 6,
+    "h": 4
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${datasource}"
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${datasource}"
+     },
+     "expr": "sum(rate(dns_auditor_responses_total[5m]))",
+     "refId": "A",
+     "format": "time_series",
+     "legendFormat": "",
+     "instant": true,
+     "range": false
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "reqps"
+    },
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ]
+    }
+   },
+   "id": 4
+  },
+  {
+   "type": "table",
+   "title": "고쳐야 할 내부 호출 (다른 네임스페이스 Service를 짧은 이름으로 호출)",
+   "gridPos": {
+    "x": 0,
+    "y": 4,
+    "w": 24,
+    "h": 10
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${datasource}"
+   },
+   "description": "각 행은 다른 네임스페이스의 Service를 짧은 이름으로 조회해 실패(NXDOMAIN)한 워크로드입니다. '대신 쓸 주소'로 바꾸세요. 수정이 배포되면 TTL(기본 15분) 뒤 행이 저절로 사라집니다.",
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${datasource}"
+     },
+     "expr": "max by (caller_namespace, caller_workload, name, suggestion) (dns_auditor_misroute_lookups_total{caller_namespace=~\"$namespace\"})",
+     "refId": "A",
+     "format": "table",
+     "legendFormat": "",
+     "instant": true,
+     "range": false
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${datasource}"
+     },
+     "expr": "max by (caller_namespace, caller_workload, name, suggestion) (dns_auditor_misroute_last_seen_timestamp_seconds{caller_namespace=~\"$namespace\"}) * 1000",
+     "refId": "B",
+     "format": "table",
+     "legendFormat": "",
+     "instant": true,
+     "range": false
+    }
+   ],
+   "transformations": [
+    {
+     "id": "merge",
+     "options": {}
+    },
+    {
+     "id": "organize",
+     "options": {
+      "excludeByName": {
+       "Time": true,
+       "caller_namespace": true
+      },
+      "indexByName": {
+       "caller_workload": 0,
+       "name": 1,
+       "suggestion": 2,
+       "Value #A": 3,
+       "Value #B": 4
+      },
+      "renameByName": {
+       "caller_workload": "호출한 곳 (ns/워크로드)",
+       "name": "찾은 이름",
+       "suggestion": "대신 쓸 주소",
+       "Value #A": "실패 횟수",
+       "Value #B": "마지막 발생"
+      }
+     }
+    },
+    {
+     "id": "sortBy",
+     "options": {
+      "sort": [
+       {
+        "field": "실패 횟수",
+        "desc": true
+       }
+      ]
+     }
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {},
+    "overrides": [
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "마지막 발생"
+      },
+      "properties": [
+       {
+        "id": "unit",
+        "value": "dateTimeFromNow"
+       }
+      ]
+     }
+    ]
+   },
+   "options": {
+    "showHeader": true,
+    "cellHeight": "sm"
+   },
+   "id": 5
+  },
+  {
+   "type": "timeseries",
+   "title": "호출자별 잘못된 조회(초당)",
+   "gridPos": {
+    "x": 0,
+    "y": 14,
+    "w": 12,
+    "h": 8
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${datasource}"
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${datasource}"
+     },
+     "expr": "sum by (caller_workload, name) (rate(dns_auditor_misroute_lookups_total{caller_namespace=~\"$namespace\"}[5m]))",
+     "refId": "A",
+     "format": "time_series",
+     "legendFormat": "{{caller_workload}} -> {{name}}"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "reqps"
+    },
+    "overrides": []
+   },
+   "id": 6
+  },
+  {
+   "type": "timeseries",
+   "title": "분류별 DNS 응답",
+   "gridPos": {
+    "x": 12,
+    "y": 14,
+    "w": 12,
+    "h": 8
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${datasource}"
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${datasource}"
+     },
+     "expr": "sum by (category) (rate(dns_auditor_responses_total[5m]))",
+     "refId": "A",
+     "format": "time_series",
+     "legendFormat": "{{category}}"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "reqps",
+     "custom": {
+      "stacking": {
+       "mode": "normal"
+      }
+     }
+    },
+    "overrides": []
+   },
+   "id": 7
+  },
+  {
+   "type": "timeseries",
+   "title": "수신기 상태",
+   "gridPos": {
+    "x": 0,
+    "y": 22,
+    "w": 24,
+    "h": 6
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${datasource}"
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${datasource}"
+     },
+     "expr": "sum(rate(dns_auditor_dnstap_frames_total[5m]))",
+     "refId": "A",
+     "format": "time_series",
+     "legendFormat": "프레임/초"
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${datasource}"
+     },
+     "expr": "sum(rate(dns_auditor_dnstap_dropped_total[5m]))",
+     "refId": "B",
+     "format": "time_series",
+     "legendFormat": "유실/초"
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${datasource}"
+     },
+     "expr": "sum(rate(dns_auditor_dnstap_decode_errors_total[5m]))",
+     "refId": "C",
+     "format": "time_series",
+     "legendFormat": "해석 오류/초"
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${datasource}"
+     },
+     "expr": "sum(rate(dns_auditor_dnstap_rejected_total[5m]))",
+     "refId": "D",
+     "format": "time_series",
+     "legendFormat": "거부된 연결/초"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "id": 8
+  }
+ ]
+}

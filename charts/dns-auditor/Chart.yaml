@@ -1,0 +1,9 @@
+apiVersion: v2
+name: dns-auditor
+description: CoreDNS dnstap으로 다른 네임스페이스 Service를 짧은 이름으로 호출해 실패하는 곳을 찾고 대신 쓸 주소를 알려 줍니다.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+home: https://github.com/hjklo0220/dns-auditor
+sources: [https://github.com/hjklo0220/dns-auditor]
+keywords: [dns, coredns, dnstap, kubernetes, platform]
