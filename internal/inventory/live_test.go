@@ -2,7 +2,9 @@ package inventory
 
 import (
 	"context"
+	"errors"
 	"net/netip"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -12,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
+	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -287,5 +290,51 @@ func TestPruneLoopStops(t *testing.T) {
 	case <-done:
 	case <-time.After(time.Second):
 		t.Fatal("pruneLoop did not stop")
+	}
+}
+
+// Regression (review #1): a terminating Pod's late update must not take an IP
+// back from the newer Pod that now owns it.
+func TestTerminatingPodDoesNotStealIP(t *testing.T) {
+	l := NewLive(LiveOptions{})
+	a := pod("shop", "old", "aaa", "uid-a", "10.0.0.5")
+	b := pod("pay", "new", "bbb", "uid-b", "10.0.0.5")
+	l.upsertPod(a)
+	l.upsertPod(b)
+	a2 := a.DeepCopy()
+	ts := metav1.NewTime(time.Now())
+	a2.DeletionTimestamp = &ts
+	l.upsertPod(a2)
+	l.deletePod(a2)
+	if w, ok := l.WorkloadForIP(netip.MustParseAddr("10.0.0.5")); !ok || w.String() != "pay/new" {
+		t.Fatalf("got %v %v", w, ok)
+	}
+	// A terminating Pod may still claim an IP nobody live holds (and its own).
+	c := pod("ops", "job", "ccc", "uid-c", "10.0.0.6")
+	c.DeletionTimestamp = &ts
+	l.upsertPod(c)
+	if w, ok := l.WorkloadForIP(netip.MustParseAddr("10.0.0.6")); !ok || w.String() != "ops/job" {
+		t.Fatalf("terminating pod with free IP: %v %v", w, ok)
+	}
+	// And a live Pod always takes over from a terminating one.
+	d := pod("ops", "next", "ddd", "uid-d", "10.0.0.6")
+	l.upsertPod(d)
+	if w, _ := l.WorkloadForIP(netip.MustParseAddr("10.0.0.6")); w.String() != "ops/next" {
+		t.Fatalf("live pod did not take over: %v", w)
+	}
+}
+
+// Regression (review #9): missing RBAC must surface as an error, not a hang.
+func TestStartTimesOutWhenListIsForbidden(t *testing.T) {
+	client := fake.NewSimpleClientset()
+	client.PrependReactor("list", "pods", func(k8stesting.Action) (bool, runtime.Object, error) {
+		return true, nil, errors.New("pods is forbidden")
+	})
+	l := NewLive(LiveOptions{SyncTimeout: 300 * time.Millisecond})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	err := l.Start(ctx, client, 0)
+	if err == nil || !strings.Contains(err.Error(), "did not sync within") {
+		t.Fatalf("got %v", err)
 	}
 }

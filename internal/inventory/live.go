@@ -24,8 +24,9 @@ import (
 // workload instead of "unknown". A new Pod that gets the same IP takes over
 // immediately.
 type Live struct {
-	grace time.Duration
-	now   func() time.Time
+	grace       time.Duration
+	syncTimeout time.Duration
+	now         func() time.Time
 
 	mu       sync.RWMutex
 	ns       map[string]struct{}
@@ -35,18 +36,24 @@ type Live struct {
 }
 
 type podEntry struct {
-	uid       types.UID
-	workload  Workload
-	deletedAt time.Time // zero while the Pod exists
+	uid         types.UID
+	workload    Workload
+	terminating bool      // DeletionTimestamp set
+	deletedAt   time.Time // zero while the Pod exists
 }
+
+// live reports whether e is a Pod that still runs and is not shutting down.
+func (e podEntry) live() bool { return e.deletedAt.IsZero() && !e.terminating }
 
 // LiveOptions configures NewLive.
 type LiveOptions struct {
 	// Grace keeps the IP of a deleted Pod attributed to its workload.
 	// Default 5m.
 	Grace time.Duration
-	// Resync is the informer resync period. Default 0 (no periodic resync).
-	Resync time.Duration
+	// SyncTimeout bounds the initial cache sync. A sync that never finishes
+	// (typically missing RBAC for list/watch) becomes an error instead of a
+	// hang. Default 2m.
+	SyncTimeout time.Duration
 	// Now overrides the clock in tests.
 	Now func() time.Time
 }
@@ -59,13 +66,17 @@ func NewLive(opt LiveOptions) *Live {
 	if opt.Now == nil {
 		opt.Now = time.Now
 	}
+	if opt.SyncTimeout <= 0 {
+		opt.SyncTimeout = 2 * time.Minute
+	}
 	return &Live{
-		grace:    opt.Grace,
-		now:      opt.Now,
-		ns:       map[string]struct{}{},
-		services: map[string]map[string]Service{},
-		byIP:     map[netip.Addr]podEntry{},
-		podIPs:   map[types.UID][]netip.Addr{},
+		grace:       opt.Grace,
+		syncTimeout: opt.SyncTimeout,
+		now:         opt.Now,
+		ns:          map[string]struct{}{},
+		services:    map[string]map[string]Service{},
+		byIP:        map[netip.Addr]podEntry{},
+		podIPs:      map[types.UID][]netip.Addr{},
 	}
 }
 
@@ -103,8 +114,13 @@ func (l *Live) Start(ctx context.Context, client kubernetes.Interface, resync ti
 		synced = append(synced, reg.HasSynced)
 	}
 	f.Start(ctx.Done())
-	if !cache.WaitForCacheSync(ctx.Done(), synced...) {
-		return fmt.Errorf("inventory: caches did not sync: %w", context.Cause(ctx))
+	syncCtx, cancel := context.WithTimeout(ctx, l.syncTimeout)
+	defer cancel()
+	if !cache.WaitForCacheSync(syncCtx.Done(), synced...) {
+		if ctx.Err() != nil {
+			return fmt.Errorf("inventory: caches did not sync: %w", context.Cause(ctx))
+		}
+		return fmt.Errorf("inventory: caches did not sync within %v (does the service account have list/watch on namespaces, services and pods?)", l.syncTimeout)
 	}
 	go l.pruneLoop(ctx)
 	return nil
@@ -255,6 +271,7 @@ func (l *Live) upsertPod(o any) {
 	}
 	w := WorkloadFromPod(p.Namespace, p.Name, p.Labels, owners)
 	ips := podAddrs(p)
+	terminating := p.DeletionTimestamp != nil
 
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -262,7 +279,12 @@ func (l *Live) upsertPod(o any) {
 	keep := map[netip.Addr]bool{}
 	for _, ip := range ips {
 		keep[ip] = true
-		l.byIP[ip] = podEntry{uid: p.UID, workload: w}
+		// A terminating Pod's late update must not take an IP back from a
+		// newer live Pod (events for different Pods are not ordered).
+		if cur, ok := l.byIP[ip]; ok && cur.uid != p.UID && cur.live() && terminating {
+			continue
+		}
+		l.byIP[ip] = podEntry{uid: p.UID, workload: w, terminating: terminating}
 	}
 	for _, old := range l.podIPs[p.UID] { // IPs this Pod no longer has
 		if !keep[old] {
