@@ -41,11 +41,19 @@ CoreDNS --dnstap(비동기, 받는 쪽이 느리면 CoreDNS가 버림)--> dns-au
 
 ## 설치
 
+Helm 차트(`charts/dns-auditor`)가 원본입니다.
+
 ```sh
-kubectl apply -f deploy/kubernetes/dns-auditor.yaml
-kubectl apply -f deploy/kubernetes/networkpolicy.yaml      # CNI가 NetworkPolicy를 적용하는 경우
-kubectl apply -f deploy/kubernetes/servicemonitor.yaml     # Prometheus Operator를 쓰는 경우
+# serviceMonitor: Prometheus Operator를 쓰는 경우
+# networkPolicy:  CNI가 NetworkPolicy를 적용하는 경우
+# dashboard:      Grafana 사이드카로 대시보드 자동 등록
+helm upgrade --install dns-auditor charts/dns-auditor -n dns-auditor --create-namespace \
+  --set serviceMonitor.enabled=true \
+  --set networkPolicy.enabled=true \
+  --set dashboard.enabled=true
 ```
+
+Helm 없이 쓰려면 차트에서 생성한 `deploy/kubernetes/*.yaml`을 `kubectl apply -f`로 적용합니다(`scripts/gen-manifests.sh`가 만들고, 하네스가 차트와 어긋나는지 검사).
 
 CoreDNS 서버 블록에 한 줄을 추가합니다. 응답 코드는 DNS 메시지 원문에만 있어서 `full`이 필요합니다.
 
@@ -61,11 +69,17 @@ kubectl -n dns-auditor get svc dns-auditor -o jsonpath='{.spec.clusterIP}'   # �
 }
 ```
 
-주소는 Service 이름이 아니라 **ClusterIP**로 적으세요. CoreDNS Pod는 보통 `dnsPolicy: Default`(노드의 DNS 사용)라서 `*.svc.cluster.local` 이름을 풀지 못합니다. ClusterIP는 Service를 지우지 않는 한 바뀌지 않습니다.
+주소는 Service 이름이 아니라 **ClusterIP**로 적으세요. CoreDNS Pod는 보통 `dnsPolicy: Default`(노드의 DNS 사용)라서 `*.svc.cluster.local` 이름을 풀지 못합니다. 재설치해도 주소가 바뀌지 않게 하려면 `service.clusterIP`로 고정하세요.
 
 EKS에서는 CoreDNS 애드온의 `configurationValues`(`corefile`)로 넣으세요. ConfigMap을 직접 고치면 애드온 업데이트 때 덮어써질 수 있습니다.
 
-`deploy/grafana/dns-auditor-dashboard.json`을 Grafana에 가져오면 워크로드별로 "무엇을 바꿔야 하는지" 표가 나옵니다. 수정이 배포되면 해당 행은 저절로 사라집니다.
+대시보드(`deploy/grafana/dns-auditor-dashboard.json`)는 워크로드별로 "무엇을 바꿔야 하는지" 표를 보여 주며, 수정이 배포되면 해당 행이 저절로 사라집니다.
+
+이미지는 `ko`로 만듭니다(Docker 불필요).
+
+```sh
+VERSION=0.1.0 KO_DOCKER_REPO=<레지스트리>/dns-auditor ko build ./cmd/dns-auditor --bare --tags 0.1.0
+```
 
 ### 지표
 
@@ -115,7 +129,7 @@ dns-auditor analyze -coredns-log coredns.log -snapshot snapshot.json [-format js
 
 ## 개발
 
-`scripts/check.sh`(또는 `make check`)가 "완료" 판정을 하는 유일한 기준입니다. gofmt, vet, golangci-lint, `-race` 테스트, 커버리지 기준(핵심 패키지별 90%), 두 파서의 짧은 fuzz, 작업 트리와 git 이력 유출 검사를 돌립니다. CI도 같은 스크립트를 실행합니다.
+`scripts/check.sh`(또는 `make check`)가 "완료" 판정을 하는 유일한 기준입니다. gofmt, vet, golangci-lint, `-race` 테스트, 커버리지 기준(핵심 패키지별 90%), 두 파서의 짧은 fuzz, Helm 차트 lint·렌더링과 생성 매니페스트 drift, 작업 트리와 git 이력 유출 검사를 돌립니다. CI도 같은 스크립트를 실행합니다.
 
 ```sh
 make check
