@@ -1,0 +1,493 @@
+{
+ "title": "dns-auditor",
+ "uid": "dns-auditor",
+ "schemaVersion": 39,
+ "version": 1,
+ "tags": [
+  "dns",
+  "kubernetes"
+ ],
+ "time": {
+  "from": "now-6h",
+  "to": "now"
+ },
+ "refresh": "1m",
+ "templating": {
+  "list": [
+   {
+    "type": "datasource",
+    "name": "datasource",
+    "label": "Data source",
+    "query": "prometheus",
+    "current": {}
+   },
+   {
+    "type": "query",
+    "name": "namespace",
+    "label": "Caller namespace",
+    "datasource": {
+     "type": "prometheus",
+     "uid": "${datasource}"
+    },
+    "query": {
+     "query": "label_values(dns_auditor_misroute_last_seen_timestamp_seconds, caller_namespace)",
+     "refId": "ns"
+    },
+    "definition": "label_values(dns_auditor_misroute_last_seen_timestamp_seconds, caller_namespace)",
+    "includeAll": true,
+    "multi": true,
+    "allValue": ".*",
+    "current": {
+     "text": "All",
+     "value": "$__all"
+    },
+    "refresh": 2
+   }
+  ]
+ },
+ "panels": [
+  {
+   "type": "stat",
+   "title": "Active findings",
+   "gridPos": {
+    "x": 0,
+    "y": 0,
+    "w": 6,
+    "h": 4
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${datasource}"
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${datasource}"
+     },
+     "expr": "dns_auditor_misroute_active",
+     "refId": "A",
+     "format": "time_series",
+     "legendFormat": "",
+     "instant": true,
+     "range": false
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "red",
+        "value": 1
+       }
+      ]
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ]
+    },
+    "colorMode": "background"
+   },
+   "id": 1
+  },
+  {
+   "type": "stat",
+   "title": "dnstap connections",
+   "gridPos": {
+    "x": 6,
+    "y": 0,
+    "w": 6,
+    "h": 4
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${datasource}"
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${datasource}"
+     },
+     "expr": "sum(dns_auditor_dnstap_connections_active)",
+     "refId": "A",
+     "format": "time_series",
+     "legendFormat": "",
+     "instant": true,
+     "range": false
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "red",
+        "value": null
+       },
+       {
+        "color": "green",
+        "value": 1
+       }
+      ]
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ]
+    },
+    "colorMode": "value"
+   },
+   "id": 2
+  },
+  {
+   "type": "stat",
+   "title": "Dropped events (1h)",
+   "gridPos": {
+    "x": 12,
+    "y": 0,
+    "w": 6,
+    "h": 4
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${datasource}"
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${datasource}"
+     },
+     "expr": "sum(increase(dns_auditor_dnstap_dropped_total[1h]))",
+     "refId": "A",
+     "format": "time_series",
+     "legendFormat": "",
+     "instant": true,
+     "range": false
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 1
+       }
+      ]
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ]
+    }
+   },
+   "id": 3
+  },
+  {
+   "type": "stat",
+   "title": "Responses/s classified",
+   "gridPos": {
+    "x": 18,
+    "y": 0,
+    "w": 6,
+    "h": 4
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${datasource}"
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${datasource}"
+     },
+     "expr": "sum(rate(dns_auditor_responses_total[5m]))",
+     "refId": "A",
+     "format": "time_series",
+     "legendFormat": "",
+     "instant": true,
+     "range": false
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "reqps"
+    },
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ]
+    }
+   },
+   "id": 4
+  },
+  {
+   "type": "table",
+   "title": "Change these in-cluster calls (short name used across namespaces)",
+   "gridPos": {
+    "x": 0,
+    "y": 4,
+    "w": 24,
+    "h": 10
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${datasource}"
+   },
+   "description": "Each row is a workload that looked up another namespace's Service by its short name. The lookup fails (NXDOMAIN). Use the address in 'Use instead'. Rows disappear on their own after the fix (no failed lookup for the TTL, 15m by default).",
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${datasource}"
+     },
+     "expr": "max by (caller_namespace, caller_workload, name, suggestion) (dns_auditor_misroute_lookups_total{caller_namespace=~\"$namespace\"})",
+     "refId": "A",
+     "format": "table",
+     "legendFormat": "",
+     "instant": true,
+     "range": false
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${datasource}"
+     },
+     "expr": "max by (caller_namespace, caller_workload, name, suggestion) (dns_auditor_misroute_last_seen_timestamp_seconds{caller_namespace=~\"$namespace\"}) * 1000",
+     "refId": "B",
+     "format": "table",
+     "legendFormat": "",
+     "instant": true,
+     "range": false
+    }
+   ],
+   "transformations": [
+    {
+     "id": "merge",
+     "options": {}
+    },
+    {
+     "id": "organize",
+     "options": {
+      "excludeByName": {
+       "Time": true,
+       "caller_namespace": true
+      },
+      "indexByName": {
+       "caller_workload": 0,
+       "name": 1,
+       "suggestion": 2,
+       "Value #A": 3,
+       "Value #B": 4
+      },
+      "renameByName": {
+       "caller_workload": "Caller (namespace/workload)",
+       "name": "Looked up",
+       "suggestion": "Use instead",
+       "Value #A": "Failed lookups",
+       "Value #B": "Last seen"
+      }
+     }
+    },
+    {
+     "id": "sortBy",
+     "options": {
+      "sort": [
+       {
+        "field": "Failed lookups",
+        "desc": true
+       }
+      ]
+     }
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {},
+    "overrides": [
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "Last seen"
+      },
+      "properties": [
+       {
+        "id": "unit",
+        "value": "dateTimeFromNow"
+       }
+      ]
+     }
+    ]
+   },
+   "options": {
+    "showHeader": true,
+    "cellHeight": "sm"
+   },
+   "id": 5
+  },
+  {
+   "type": "timeseries",
+   "title": "Misrouted lookups/s by caller",
+   "gridPos": {
+    "x": 0,
+    "y": 14,
+    "w": 12,
+    "h": 8
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${datasource}"
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${datasource}"
+     },
+     "expr": "sum by (caller_workload, name) (rate(dns_auditor_misroute_lookups_total{caller_namespace=~\"$namespace\"}[5m]))",
+     "refId": "A",
+     "format": "time_series",
+     "legendFormat": "{{caller_workload}} -> {{name}}"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "reqps"
+    },
+    "overrides": []
+   },
+   "id": 6
+  },
+  {
+   "type": "timeseries",
+   "title": "DNS responses by category",
+   "gridPos": {
+    "x": 12,
+    "y": 14,
+    "w": 12,
+    "h": 8
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${datasource}"
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${datasource}"
+     },
+     "expr": "sum by (category) (rate(dns_auditor_responses_total[5m]))",
+     "refId": "A",
+     "format": "time_series",
+     "legendFormat": "{{category}}"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "reqps",
+     "custom": {
+      "stacking": {
+       "mode": "normal"
+      }
+     }
+    },
+    "overrides": []
+   },
+   "id": 7
+  },
+  {
+   "type": "timeseries",
+   "title": "Receiver health",
+   "gridPos": {
+    "x": 0,
+    "y": 22,
+    "w": 24,
+    "h": 6
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${datasource}"
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${datasource}"
+     },
+     "expr": "sum(rate(dns_auditor_dnstap_frames_total[5m]))",
+     "refId": "A",
+     "format": "time_series",
+     "legendFormat": "frames/s"
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${datasource}"
+     },
+     "expr": "sum(rate(dns_auditor_dnstap_dropped_total[5m]))",
+     "refId": "B",
+     "format": "time_series",
+     "legendFormat": "dropped/s"
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${datasource}"
+     },
+     "expr": "sum(rate(dns_auditor_dnstap_decode_errors_total[5m]))",
+     "refId": "C",
+     "format": "time_series",
+     "legendFormat": "decode errors/s"
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${datasource}"
+     },
+     "expr": "sum(rate(dns_auditor_dnstap_rejected_total[5m]))",
+     "refId": "D",
+     "format": "time_series",
+     "legendFormat": "rejected conns/s"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "id": 8
+  }
+ ]
+}
