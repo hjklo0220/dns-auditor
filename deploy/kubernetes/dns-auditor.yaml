@@ -1,6 +1,8 @@
-# Generic manifests. Apply, then point CoreDNS at the Service:
+# Generic manifests. Apply, then point CoreDNS at the Service's ClusterIP
+# (CoreDNS Pods usually use dnsPolicy: Default and cannot resolve
+# *.svc.cluster.local names):
 #
-#   dnstap tcp://dns-auditor.dns-auditor.svc.cluster.local:6000 full
+#   dnstap tcp://<clusterIP>:6000 full
 #
 # (inside the `.:53 { ... }` server block of the Corefile)
 apiVersion: v1

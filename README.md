@@ -49,13 +49,19 @@ kubectl apply -f deploy/kubernetes/servicemonitor.yaml     # Prometheus Operator
 
 CoreDNS 서버 블록에 한 줄을 추가합니다. 응답 코드는 DNS 메시지 원문에만 있어서 `full`이 필요합니다.
 
+```sh
+kubectl -n dns-auditor get svc dns-auditor -o jsonpath='{.spec.clusterIP}'   # 예: 10.100.100.55
+```
+
 ```
 .:53 {
     errors
-    dnstap tcp://dns-auditor.dns-auditor.svc.cluster.local:6000 full
+    dnstap tcp://10.100.100.55:6000 full
     ...
 }
 ```
+
+주소는 Service 이름이 아니라 **ClusterIP**로 적으세요. CoreDNS Pod는 보통 `dnsPolicy: Default`(노드의 DNS 사용)라서 `*.svc.cluster.local` 이름을 풀지 못합니다. ClusterIP는 Service를 지우지 않는 한 바뀌지 않습니다.
 
 EKS에서는 CoreDNS 애드온의 `configurationValues`(`corefile`)로 넣으세요. ConfigMap을 직접 고치면 애드온 업데이트 때 덮어써질 수 있습니다.
 
